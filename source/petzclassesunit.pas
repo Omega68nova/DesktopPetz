@@ -698,6 +698,50 @@ begin
   end;
 end;
 
+// Read-only diagnostics for the DesktopPetz bridge investigation.
+// Explicit opt-in via DESKTOPPETZ_DIAGNOSTICS=1; emits at most once per second.
+// The coordinates below are Petz playscene coordinates, NOT desktop pixels.
+var DesktopPetzLastDiagnostic: DWORD = 0;
+
+procedure DesktopPetzDiagnosticSnapshot;
+var
+  list: TObjectList;
+  i: Integer;
+  pet: TPetzPetSprite;
+  bounds: TRect;
+  line: string;
+  env: array[0..7] of Char;
+  tick: DWORD;
+begin
+  if (cpetzver <> pvpetz5) or (petzclassesman = nil) then Exit;
+  if GetEnvironmentVariable('DESKTOPPETZ_DIAGNOSTICS', env, Length(env)) <> 1 then Exit;
+  if env[0] <> '1' then Exit;
+  tick := GetTickCount;
+  if (DesktopPetzLastDiagnostic <> 0) and
+     (DWORD(tick - DesktopPetzLastDiagnostic) < 1000) then Exit;
+  DesktopPetzLastDiagnostic := tick;
+  list := TObjectList.Create(False);
+  try
+    petzclassesman.findclassinstances(cnpetsprite, list);
+    for i := 0 to list.Count - 1 do
+    begin
+      pet := TPetzPetSprite(TPetzClassInstance(list[i]).instance);
+      if pet = nil then Continue;
+      try
+        bounds := PRect(thiscall(pet, rimports.alposprite_getgrabrect, []))^;
+        line := Format('DesktopPetz pet id=%d name=%s rect=%d,%d,%d,%d',
+          [pet.id, pet.name, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom]);
+        OutputDebugString(PChar(line));
+      except
+        on E: Exception do
+          OutputDebugString(PChar('DesktopPetz diagnostic failed: ' + E.ClassName));
+      end;
+    end;
+  finally
+    list.Free;
+  end;
+end;
+
 procedure mypetzapp_dodrawframe(return, instance: pointer); stdcall;
 var xstage {, xsaveport, xtileport, xdrawport}: pointer;
   r: trect;
@@ -727,6 +771,7 @@ begin
       if (getxscreen <> nil) then begin
          //thiscall(xtileport, rimports.xdrawport_xfillrect, [cardinal(@r), 00000000]);
         if petza.shownametags then drawpetnametags(xstage, getxscreen);
+         DesktopPetzDiagnosticSnapshot;
 {        if not notagain then begin
         displayport(xtileport,'c:\dumptile.raw');
         displayport(xsaveport,'c:\dumpsave.raw');

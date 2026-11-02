@@ -25,6 +25,7 @@ uses
   bndpetz,
   dllpatchunit in 'dllpatchunit.pas',
   petzclassesunit in 'petzclassesunit.pas',
+  desktopbridgeunit in 'desktopbridgeunit.pas',
   aboutunit in 'aboutunit.pas' {frmAbout},
   mymenuunit in 'mymenuunit.pas',
   sliderbrainunit in 'sliderbrainunit.pas' {frmSliderBrain},

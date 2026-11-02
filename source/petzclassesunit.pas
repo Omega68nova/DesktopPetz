@@ -737,8 +737,12 @@ var
   count: Integer;
 begin
   if (cpetzver <> pvpetz5) or (petzclassesman = nil) then Exit;
-  if GetEnvironmentVariable('DESKTOPPETZ_DIAGNOSTICS', env, Length(env)) <> 1 then Exit;
-  if env[0] <> '1' then Exit;
+  if (GetEnvironmentVariable('DESKTOPPETZ_DIAGNOSTICS', env, Length(env)) <> 1) or
+     (env[0] <> '1') then
+  begin
+    if (GetEnvironmentVariable('DESKTOPPETZ_PIPE', env, Length(env)) <> 1) or
+       (env[0] <> '1') then Exit;
+  end;
   tick := GetTickCount;
   if (DesktopPetzLastDiagnostic <> 0) and
      (DWORD(tick - DesktopPetzLastDiagnostic) < 1000) then Exit;

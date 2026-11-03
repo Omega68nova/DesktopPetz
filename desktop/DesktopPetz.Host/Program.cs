@@ -18,7 +18,7 @@ internal static class Program
 
 // Diagnostic protocol only. PetzA must explicitly publish live pet states in a later phase.
 public sealed record PetState(string Id, string Name, float X, float Y, string? Animation);
-public sealed record BridgeFrame(int Version, List<PetState> Pets);
+public sealed record BridgeFrame(int Version, List<PetState> Pets, string? Space = null);
 
 internal sealed class DesktopOverlay : Form
 {
@@ -26,6 +26,13 @@ internal sealed class DesktopOverlay : Form
     private readonly CancellationTokenSource shutdown = new();
     private readonly object gate = new();
     private List<PetState> pets = [];
+    private readonly RectangleF? sourceRect = LoadSourceRect();
+
+    private static RectangleF? LoadSourceRect()
+    {
+        var value = Environment.GetEnvironmentVariable("DESKTOPPETZ_SOURCE_RECT");
+        return string.IsNullOrWhiteSpace(value) ? null : DesktopCoordinates.ParseSource(value);
+    }
     private readonly Font labelFont = new("Segoe UI", 10, FontStyle.Bold);
     private readonly Rectangle desktop = SystemInformation.VirtualScreen;
 
@@ -75,7 +82,18 @@ internal sealed class DesktopOverlay : Form
                         var frame = JsonSerializer.Deserialize<BridgeFrame>(line,
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                         if (frame is null || frame.Version != 1 || frame.Pets is null || frame.Pets.Count > 64) continue;
-                        lock (gate) pets = frame.Pets;
+                        // Explicit spaces prevent silently treating Petz playscene coordinates
+                        // as desktop pixels. No guessed default stage size.
+                        if (frame.Space is not (null or "desktop" or "playscene")) continue;
+                        if (frame.Space == "playscene" && sourceRect is null) continue;
+                        var mapped = frame.Space == "playscene"
+                            ? frame.Pets.Select(p =>
+                            {
+                                var point = DesktopCoordinates.Map(p.X, p.Y, sourceRect!.Value, desktop);
+                                return p with { X = point.X, Y = point.Y };
+                            }).ToList()
+                            : frame.Pets;
+                        lock (gate) pets = mapped;
                     }
                     catch (JsonException) { /* Ignore malformed diagnostics. */ }
                 }

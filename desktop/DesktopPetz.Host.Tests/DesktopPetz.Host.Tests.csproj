@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../DesktopPetz.Host/DesktopCoordinates.cs" Link="DesktopCoordinates.cs" />
+    <Compile Include="../DesktopPetz.Host/DesktopWorld.cs" Link="DesktopWorld.cs" />
+  </ItemGroup>
+</Project>

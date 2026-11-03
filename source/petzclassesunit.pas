@@ -768,7 +768,7 @@ begin
             '","name":"' + DesktopPetzEscape(pet.name) +
             '","x":' + AnsiString(IntToStr((bounds.Left + bounds.Right) div 2)) +
             ',"y":' + AnsiString(IntToStr(bounds.Bottom)) +
-            ',"animation":null}';
+            ',"animation":null,"stateFlag":' + AnsiString(IntToStr(Int64(pet.stateflag))) + '}';
           Inc(count);
         end;
       except

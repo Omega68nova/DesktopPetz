@@ -26,6 +26,9 @@ internal sealed class DesktopOverlay : Form
     private readonly CancellationTokenSource shutdown = new();
     private readonly object gate = new();
     private List<PetState> pets = [];
+    private readonly bool desktopAiEnabled = Environment.GetEnvironmentVariable("DESKTOPPETZ_DESKTOP_AI") == "1";
+    private readonly DesktopBehavior desktopAi = new(SystemInformation.VirtualScreen);
+    private DateTime lastTick = DateTime.UtcNow;
     private readonly RectangleF? sourceRect = LoadSourceRect();
 
     private static RectangleF? LoadSourceRect()
@@ -48,7 +51,22 @@ internal sealed class DesktopOverlay : Form
         TransparencyKey = Color.Magenta;
         DoubleBuffered = true;
         // Do not capture clicks: the diagnostic overlay must not interfere with desktop use.
-        repaint.Tick += (_, _) => Invalidate();
+        repaint.Tick += (_, _) =>
+        {
+            if (desktopAiEnabled)
+            {
+                var now = DateTime.UtcNow;
+                var elapsed = (float)(now - lastTick).TotalSeconds;
+                lastTick = now;
+                lock (gate)
+                {
+                    var poses = desktopAi.Tick(Math.Clamp(elapsed, 0f, 1f));
+                    pets = poses.Select(p => new PetState(p.Id, p.Name,
+                        p.Position.X, p.Position.Y, p.Activity)).ToList();
+                }
+            }
+            Invalidate();
+        };
         repaint.Start();
         _ = Task.Run(() => ReadBridgeAsync(shutdown.Token));
     }
@@ -93,7 +111,11 @@ internal sealed class DesktopOverlay : Form
                                 return p with { X = point.X, Y = point.Y };
                             }).ToList()
                             : frame.Pets;
-                        lock (gate) pets = mapped;
+                        lock (gate)
+                        {
+                            if (desktopAiEnabled) desktopAi.Observe(mapped);
+                            else pets = mapped;
+                        }
                     }
                     catch (JsonException) { /* Ignore malformed diagnostics. */ }
                 }

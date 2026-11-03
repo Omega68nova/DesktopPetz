@@ -17,7 +17,6 @@ internal static class Program
 }
 
 // Diagnostic protocol only. PetzA must explicitly publish live pet states in a later phase.
-public sealed record PetState(string Id, string Name, float X, float Y, string? Animation);
 public sealed record BridgeFrame(int Version, List<PetState> Pets, string? Space = null);
 
 internal sealed class DesktopOverlay : Form

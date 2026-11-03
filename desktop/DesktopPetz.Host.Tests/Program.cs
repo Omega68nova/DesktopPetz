@@ -35,3 +35,14 @@ Near(ai.Tick(0).Single().Position.X, movedPet.Position.X);
 if (ai.Command(new DesktopPetCommand("a", "move", float.NaN, 1)))
     throw new Exception("Invalid move accepted");
 Console.WriteLine("Desktop behavior checks passed.");
+
+var linked = new DesktopBehavior(desktop);
+linked.Observe(new[] { new PetState("native", "Native", -100, 0, null, 4) });
+linked.Observe(new[] { new PetState("native", "Native", -80, 10, null, 4) });
+var nativePose = linked.Tick(0.1f).Single();
+Near(nativePose.Position.X, -80);
+Near(nativePose.Position.Y, 10);
+if (nativePose.Activity != "native-motion") throw new Exception("Native motion not propagated");
+linked.Observe(new[] { new PetState("native", "Native", 900, 900, null, 4) });
+Near(linked.Tick(0.1f).Single().Position.X, -80);
+Console.WriteLine("Native AI movement bridge checks passed.");

@@ -9,3 +9,11 @@ This does not yet issue Petz 5 AI actions or select real animation frames. The o
 Limitations: rectangular virtual-desktop bounds can include gaps between monitors; window collisions, gravity, pathfinding, and DPI handling are not implemented. The policy is deterministic, not learned AI.
 
 Run `dotnet run --project desktop/DesktopPetz.Host.Tests` to exercise coordinate and movement checks without Petz 5. Windows runtime and native Delphi compilation are still unverified.
+
+## Native Petz AI to desktop marker bridge
+
+PetzA now includes a raw `stateFlag` in its pet snapshots. The desktop controller accepts incoming pet position observations, computes bounded movement deltas, and applies those deltas to the desktop pet's existing position. It does **not** replace the desktop position with the original stage coordinate on every update. A short hold after observed native movement avoids competing autonomous wandering; when the native pet stops moving, desktop wandering resumes.
+
+A displacement greater than 240 desktop pixels per observation is treated as a teleport/outlier and ignored. The `stateFlag` is retained as an opaque native observation: its bits have not yet been reverse-engineered, so it must not be interpreted as a particular mood or action. Existing source rectangle mapping is still required for playscene frames.
+
+This provides **Petz simulation -> desktop marker** communication, not full bidirectional AI control. `DesktopPetCommand` currently controls the desktop-side movement policy only; no native command pipe or safe Petz AI command dispatch exists yet. Also, marker activity is not a real Petz animation. No runtime build or Windows integration test has been performed.

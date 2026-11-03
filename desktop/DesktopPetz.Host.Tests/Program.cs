@@ -22,3 +22,16 @@ Near(moved.X, -1100); Near(moved.Y, 200);
 var edge = world.Move(new PointF(1919, 1079), new PointF(100, 100), 1);
 Near(edge.X, 1919); Near(edge.Y, 1079);
 Console.WriteLine("Desktop coordinate mapping checks passed.");
+
+var ai = new DesktopBehavior(desktop, 100);
+ai.Observe(new[] { new PetState("a", "A", -100, 0, null) });
+if (!ai.Command(new DesktopPetCommand("a", "move", -500, 200)))
+    throw new Exception("Move command failed");
+var movedPet = ai.Tick(1).Single();
+Near(movedPet.Position.X, -189.44272f);
+Near(movedPet.Position.Y, 44.72136f);
+ai.Observe(new[] { new PetState("a", "B", 1000, 1000, null) });
+Near(ai.Tick(0).Single().Position.X, movedPet.Position.X);
+if (ai.Command(new DesktopPetCommand("a", "move", float.NaN, 1)))
+    throw new Exception("Invalid move accepted");
+Console.WriteLine("Desktop behavior checks passed.");

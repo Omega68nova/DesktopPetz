@@ -747,7 +747,7 @@ begin
   if (DesktopPetzLastDiagnostic <> 0) and
      (DWORD(tick - DesktopPetzLastDiagnostic) < 1000) then Exit;
   DesktopPetzLastDiagnostic := tick;
-  json := '{"version":1,"pets":[';
+  json := '{"version":1,"space":"playscene","pets":[';
   count := 0;
   list := TObjectList.Create(False);
   try

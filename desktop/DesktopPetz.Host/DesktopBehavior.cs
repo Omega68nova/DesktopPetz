@@ -16,6 +16,10 @@ public sealed class DesktopBehavior
         public string Activity = "idle";
         public float IdleSeconds;
         public int Step;
+        public PointF LastObserved;
+        public bool HasObservation;
+        public float NativeMotionHold;
+        public uint? NativeStateFlag;
     }
 
     private readonly Dictionary<string, Actor> actors = new(StringComparer.Ordinal);
@@ -42,12 +46,34 @@ public sealed class DesktopBehavior
             if (actors.TryGetValue(pet.Id, out var existing))
             {
                 existing.Name = pet.Name;
+                existing.NativeStateFlag = pet.StateFlag;
+                // Use the original simulation's movement delta, not its absolute
+                // playscene position, so the desktop pet does not snap backwards.
+                var observed = new PointF(pet.X, pet.Y);
+                if (existing.HasObservation)
+                {
+                    var dx = observed.X - existing.LastObserved.X;
+                    var dy = observed.Y - existing.LastObserved.Y;
+                    var magnitude = MathF.Sqrt(dx * dx + dy * dy);
+                    if (magnitude > 1 && magnitude <= 240)
+                    {
+                        existing.Position = DesktopCoordinates.ClampToDesktop(
+                            existing.Position.X + dx, existing.Position.Y + dy, world.Bounds);
+                        existing.Target = existing.Position;
+                        existing.NativeMotionHold = 1.5f;
+                        existing.Activity = "native-motion";
+                    }
+                }
+                existing.LastObserved = observed;
+                existing.HasObservation = true;
                 continue;
             }
             var position = DesktopCoordinates.ClampToDesktop(pet.X, pet.Y, world.Bounds);
             actors.Add(pet.Id, new Actor
             {
-                Id = pet.Id, Name = pet.Name, Position = position, Target = position
+                Id = pet.Id, Name = pet.Name, Position = position, Target = position,
+                LastObserved = new PointF(pet.X, pet.Y), HasObservation = true,
+                NativeStateFlag = pet.StateFlag
             });
         }
         foreach (var id in actors.Keys.Where(id => !seen.Contains(id)).ToArray())
@@ -81,6 +107,11 @@ public sealed class DesktopBehavior
             throw new ArgumentOutOfRangeException(nameof(seconds));
         foreach (var actor in actors.Values)
         {
+            if (actor.NativeMotionHold > 0)
+            {
+                actor.NativeMotionHold = MathF.Max(0, actor.NativeMotionHold - seconds);
+                continue;
+            }
             var dx = actor.Target.X - actor.Position.X;
             var dy = actor.Target.Y - actor.Position.Y;
             var distance = MathF.Sqrt(dx * dx + dy * dy);

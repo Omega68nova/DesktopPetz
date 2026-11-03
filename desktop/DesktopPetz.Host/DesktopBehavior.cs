@@ -87,6 +87,7 @@ public sealed class DesktopBehavior
         {
             case "idle":
                 actor.Target = actor.Position;
+                actor.NativeMotionHold = 0;
                 actor.Activity = "idle";
                 actor.IdleSeconds = 0;
                 return true;
@@ -94,6 +95,7 @@ public sealed class DesktopBehavior
                 if (command.X is not float x || command.Y is not float y ||
                     !float.IsFinite(x) || !float.IsFinite(y)) return false;
                 actor.Target = DesktopCoordinates.ClampToDesktop(x, y, world.Bounds);
+                actor.NativeMotionHold = 0;
                 actor.Activity = "walking";
                 return true;
             default:

@@ -184,7 +184,7 @@ type TRPetzApp = record
 var petzclassesman: tpetzclassesman;
 
 implementation
-uses dllformunit, petzcommon1, petzaunit;
+uses dllformunit, petzcommon1, petzaunit, desktopbridgeunit;
 
 function tpetzpetzapp.getpetmodule: tpetzpetmodule;
 begin
@@ -698,6 +698,90 @@ begin
   end;
 end;
 
+// Read-only diagnostics for the DesktopPetz bridge investigation.
+// Explicit opt-in via DESKTOPPETZ_DIAGNOSTICS=1; emits at most once per second.
+// The coordinates below are Petz playscene coordinates, NOT desktop pixels.
+var DesktopPetzLastDiagnostic: DWORD = 0;
+
+function DesktopPetzEscape(const Value: string): AnsiString;
+var
+  i: Integer;
+  c: Char;
+begin
+  Result := '';
+  for i := 1 to Length(Value) do
+  begin
+    c := Value[i];
+    case c of
+      '"': Result := Result + '\"';
+      '\': Result := Result + '\\';
+      #10, #13, #9: Result := Result + ' ';
+    else
+      if Ord(c) < 32 then Result := Result + ' '
+      else if Ord(c) < 128 then Result := Result + AnsiChar(c)
+      else Result := Result + '?';
+    end;
+  end;
+end;
+
+procedure DesktopPetzDiagnosticSnapshot;
+var
+  list: TObjectList;
+  i: Integer;
+  pet: TPetzPetSprite;
+  bounds: TRect;
+  line: string;
+  env: array[0..7] of Char;
+  tick: DWORD;
+  json: AnsiString;
+  count: Integer;
+begin
+  if (cpetzver <> pvpetz5) or (petzclassesman = nil) then Exit;
+  if (GetEnvironmentVariable('DESKTOPPETZ_DIAGNOSTICS', env, Length(env)) <> 1) or
+     (env[0] <> '1') then
+  begin
+    if (GetEnvironmentVariable('DESKTOPPETZ_PIPE', env, Length(env)) <> 1) or
+       (env[0] <> '1') then Exit;
+  end;
+  tick := GetTickCount;
+  if (DesktopPetzLastDiagnostic <> 0) and
+     (DWORD(tick - DesktopPetzLastDiagnostic) < 1000) then Exit;
+  DesktopPetzLastDiagnostic := tick;
+  json := '{"version":1,"space":"playscene","pets":[';
+  count := 0;
+  list := TObjectList.Create(False);
+  try
+    petzclassesman.findclassinstances(cnpetsprite, list);
+    for i := 0 to list.Count - 1 do
+    begin
+      pet := TPetzPetSprite(TPetzClassInstance(list[i]).instance);
+      if pet = nil then Continue;
+      try
+        bounds := PRect(thiscall(pet, rimports.alposprite_getgrabrect, []))^;
+        line := Format('DesktopPetz pet id=%d name=%s rect=%d,%d,%d,%d',
+          [pet.id, pet.name, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom]);
+        OutputDebugString(PChar(line));
+        if count < 64 then
+        begin
+          if count > 0 then json := json + ',';
+          json := json + '{"id":"' + AnsiString(IntToStr(pet.id)) +
+            '","name":"' + DesktopPetzEscape(pet.name) +
+            '","x":' + AnsiString(IntToStr((bounds.Left + bounds.Right) div 2)) +
+            ',"y":' + AnsiString(IntToStr(bounds.Bottom)) +
+            ',"animation":null,"stateFlag":' + AnsiString(IntToStr(Int64(pet.stateflag))) + '}';
+          Inc(count);
+        end;
+      except
+        on E: Exception do
+          OutputDebugString(PChar('DesktopPetz diagnostic failed: ' + E.ClassName));
+      end;
+    end;
+  finally
+    list.Free;
+  end;
+  DesktopBridgePublish(json + ']}');
+end;
+
 procedure mypetzapp_dodrawframe(return, instance: pointer); stdcall;
 var xstage {, xsaveport, xtileport, xdrawport}: pointer;
   r: trect;
@@ -727,6 +811,7 @@ begin
       if (getxscreen <> nil) then begin
          //thiscall(xtileport, rimports.xdrawport_xfillrect, [cardinal(@r), 00000000]);
         if petza.shownametags then drawpetnametags(xstage, getxscreen);
+         DesktopPetzDiagnosticSnapshot;
 {        if not notagain then begin
         displayport(xtileport,'c:\dumptile.raw');
         displayport(xsaveport,'c:\dumpsave.raw');
